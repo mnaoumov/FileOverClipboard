@@ -11,7 +11,6 @@ Set-StrictMode -Version Latest
 function PSScriptRoot { $MyInvocation.ScriptName | Split-Path }
 Trap { throw $_ }
 
-
 function Main
 {
     if ($FilePath)
@@ -64,12 +63,42 @@ function Receive-FileOverClipboard
         }
 }
 
+$CommandPrefix = "===+++"
+
 function Get-ClipboardCommand
 {
-    return New-Object PSObject -Property `
+    param
+    (
+        [string] $text
+    )
+
+    $badCommand = New-Object PSObject -Property `
         @{
             Name = $null;
-            Argument = "TODO";
+            Argument = $null;
+        }
+
+    if (-not $text)
+    {
+        return $badCommand
+    }
+
+    $lines = $text -split "`n"
+
+    if ($lines.Length -ne 2)
+    {
+        return $badCommand
+    }
+
+    if (-not $lines[0].StartsWith($CommandPrefix))
+    {
+        return $badCommand
+    }
+
+    return New-Object PSObject -Property `
+        @{
+            Name = $lines[0] -replace "^$CommandPrefix";
+            Argument = $lines[1];
         }
 }
 
