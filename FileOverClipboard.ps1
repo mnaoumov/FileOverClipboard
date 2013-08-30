@@ -35,11 +35,70 @@ function Send-FileOverClipboard
     {
         throw "File $FilePath not exists"
     }
+
+    Register-ClipboardTextChangedEvent -Action `
+        {
+            param
+            (
+                $text
+            )
+
+            $command = Get-ClipboardCommand $text
+
+            Invoke-SendFileProcessor $command
+        }
 }
 
 function Receive-FileOverClipboard
 {
+    Register-ClipboardTextChangedEvent -Action `
+        {
+            param
+            (
+                $text
+            )
+
+            $command = Get-ClipboardCommand $text
+
+            Invoke-ReceiveFileProcessor $command
+        }
 }
+
+function Get-ClipboardCommand
+{
+    return New-Object PSObject -Property `
+        @{
+            Name = $null;
+            Argument = "TODO";
+        }
+}
+
+function Invoke-SendFileProcessor
+{
+    param
+    (
+        $command
+    )
+
+    switch ($command.Name)
+    {
+        $null { return }
+    }
+}
+
+function Invoke-RecieveFileProcessor
+{
+    param
+    (
+        $command
+    )
+
+    switch ($command.Name)
+    {
+        $null { return }
+    }
+}
+
 
 function Register-ClipboardWatcher
 {
