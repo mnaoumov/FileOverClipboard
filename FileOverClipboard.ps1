@@ -3,6 +3,7 @@
 [CmdletBinding()]
 param
 (
+    [string] $FilePath
 )
 
 $script:ErrorActionPreference = "Stop"
@@ -13,7 +14,31 @@ Trap { throw $_ }
 
 function Main
 {
+    if ($FilePath)
+    {
+        Send-FileOverClipboard $FilePath
+    }
+    else
+    {
+        Receive-FileOverClipboard
+    }
+}
 
+function Send-FileOverClipboard
+{
+    param
+    (
+        [string] $FilePath
+    )
+
+    if (-not (Test-Path $FilePath))
+    {
+        throw "File $FilePath not exists"
+    }
+}
+
+function Receive-FileOverClipboard
+{
 }
 
 function Register-ClipboardWatcher
