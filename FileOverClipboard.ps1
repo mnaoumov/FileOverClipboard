@@ -102,6 +102,17 @@ function Get-ClipboardCommand
         }
 }
 
+function Send-ClipboardCommand
+{
+    param
+    (
+        [string] $name,
+        [string] $argument
+    )
+
+    "$CommandPrefix$name`n$argument" | clip
+}
+
 function Invoke-SendFileProcessor
 {
     param
