@@ -65,6 +65,9 @@ function Receive-FileOverClipboard
 
             Invoke-ReceiveFileProcessor $command
         }
+
+    Wait-Event -SourceIdentifier Receive.Complete
+    Unregister-ClipboardWatcher
 }
 
 $Global:ClipboardCommandPrefix = "===+++"
@@ -126,7 +129,7 @@ function Global:Invoke-SendFileProcessor
 
     switch ($command.Name)
     {
-        default `
+        default
             {
                 return
             }
@@ -147,10 +150,22 @@ function Global:Invoke-ReceiveFileProcessor
 
     switch ($command.Name)
     {
-        $null { return }
+        default
+            {
+                return
+            }
+
+        "StartSend"
+            {
+                Send-ClipboardCommand -Name StartReceive
+            }
+
+        "StartReceive"
+            {
+                New-Event -SourceIdentifier Receive.Complete
+            } 
     }
 }
-
 
 function Register-ClipboardWatcher
 {
