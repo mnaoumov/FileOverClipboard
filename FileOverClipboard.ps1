@@ -163,8 +163,6 @@ function Unregister-ClipboardWatcher
         $Global:ClipboardWatcher.Dispose();
         Remove-Variable ClipboardWatcher -Scope Global
     }
-
-    return $Global:ClipboardWatcher
 }
 
 function Register-ClipboardWatcherType
