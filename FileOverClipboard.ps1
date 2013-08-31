@@ -46,6 +46,10 @@ function Send-FileOverClipboard
 
             Invoke-SendFileProcessor $command
         }
+
+    Send-ClipboardCommand -Name StartSend
+    Wait-Event -SourceIdentifier Send.Complete
+    Unregister-ClipboardWatcher
 }
 
 function Receive-FileOverClipboard
@@ -122,7 +126,15 @@ function Global:Invoke-SendFileProcessor
 
     switch ($command.Name)
     {
-        $null { return }
+        default `
+            {
+                return
+            }
+
+        "StartSend"
+            {
+                New-Event -SourceIdentifier Send.Complete
+            }
     }
 }
 
