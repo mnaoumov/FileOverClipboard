@@ -106,11 +106,11 @@ function Global:Send-ClipboardCommand
 {
     param
     (
-        [string] $name,
-        [string] $argument
+        [string] $Name,
+        [string] $Argument
     )
 
-    "$ClipboardCommandPrefix$name`n$argument" | clip
+    "$ClipboardCommandPrefix$Name`n$Argument" | clip
 }
 
 function Global:Invoke-SendFileProcessor
