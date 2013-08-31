@@ -45,10 +45,10 @@ function Send-FileOverClipboard
             $command = Get-ClipboardCommand $text
 
             Invoke-SendFileProcessor $command
-        }
+        } | Out-Null
 
     Send-ClipboardCommand -Name StartSend
-    Wait-Event -SourceIdentifier Send.Complete
+    Wait-Event -SourceIdentifier Send.Complete | Out-Null
     Unregister-ClipboardWatcher
 }
 
@@ -64,9 +64,9 @@ function Receive-FileOverClipboard
             $command = Get-ClipboardCommand $text
 
             Invoke-ReceiveFileProcessor $command
-        }
+        } | Out-Null
 
-    Wait-Event -SourceIdentifier Receive.Complete
+    Wait-Event -SourceIdentifier Receive.Complete | Out-Null
     Unregister-ClipboardWatcher
 }
 
@@ -136,7 +136,7 @@ function Global:Invoke-SendFileProcessor
 
         "StartSend"
             {
-                New-Event -SourceIdentifier Send.Complete
+                New-Event -SourceIdentifier Send.Complete | Out-Null
             }
     }
 }
@@ -162,7 +162,7 @@ function Global:Invoke-ReceiveFileProcessor
 
         "StartReceive"
             {
-                New-Event -SourceIdentifier Receive.Complete
+                New-Event -SourceIdentifier Receive.Complete | Out-Null
             } 
     }
 }
