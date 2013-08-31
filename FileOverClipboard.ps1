@@ -97,7 +97,7 @@ function Global:Get-ClipboardCommand
 
     return New-Object PSObject -Property `
         @{
-            Name = $lines[0] -replace "^$ClipboardCommandPrefix";
+            Name = $lines[0].Substring($ClipboardCommandPrefix.Length)
             Argument = $lines[1];
         }
 }
