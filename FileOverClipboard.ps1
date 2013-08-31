@@ -63,9 +63,9 @@ function Receive-FileOverClipboard
         }
 }
 
-$CommandPrefix = "===+++"
+$Global:ClipboardCommandPrefix = "===+++"
 
-function Get-ClipboardCommand
+function Global:Get-ClipboardCommand
 {
     param
     (
@@ -90,19 +90,19 @@ function Get-ClipboardCommand
         return $badCommand
     }
 
-    if (-not $lines[0].StartsWith($CommandPrefix))
+    if (-not $lines[0].StartsWith($ClipboardCommandPrefix))
     {
         return $badCommand
     }
 
     return New-Object PSObject -Property `
         @{
-            Name = $lines[0] -replace "^$CommandPrefix";
+            Name = $lines[0] -replace "^$ClipboardCommandPrefix";
             Argument = $lines[1];
         }
 }
 
-function Send-ClipboardCommand
+function Global:Send-ClipboardCommand
 {
     param
     (
@@ -110,10 +110,10 @@ function Send-ClipboardCommand
         [string] $argument
     )
 
-    "$CommandPrefix$name`n$argument" | clip
+    "$ClipboardCommandPrefix$name`n$argument" | clip
 }
 
-function Invoke-SendFileProcessor
+function Global:Invoke-SendFileProcessor
 {
     param
     (
@@ -126,7 +126,7 @@ function Invoke-SendFileProcessor
     }
 }
 
-function Invoke-RecieveFileProcessor
+function Global:Invoke-ReceiveFileProcessor
 {
     param
     (
