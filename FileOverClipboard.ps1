@@ -50,6 +50,7 @@ function Send-FileOverClipboard
     Send-ClipboardCommand -Name StartSend
     Wait-Event -SourceIdentifier Send.Complete | Out-Null
     Unregister-ClipboardWatcher
+    Remove-Event -SourceIdentifier Send.Complete
 }
 
 function Receive-FileOverClipboard
@@ -68,6 +69,7 @@ function Receive-FileOverClipboard
 
     Wait-Event -SourceIdentifier Receive.Complete | Out-Null
     Unregister-ClipboardWatcher
+    Remove-Event -SourceIdentifier Receive.Complete
 }
 
 $Global:ClipboardCommandPrefix = "===+++"
@@ -127,6 +129,8 @@ function Global:Invoke-SendFileProcessor
         $command
     )
 
+    Write-Verbose "Processing command: $Command"
+
     switch ($command.Name)
     {
         default
@@ -147,6 +151,8 @@ function Global:Invoke-ReceiveFileProcessor
     (
         $command
     )
+
+    Write-Verbose "Processing command: $Command"
 
     switch ($command.Name)
     {
@@ -332,7 +338,6 @@ function Register-ClipboardTextChangedEvent
     )
 
     $watcher = Register-ClipboardWatcher
-    Register-ObjectEvent $watcher -EventName ClipboardTextChanged -Action $Action
     Register-ObjectEvent $watcher -EventName ClipboardTextChanged -Action $Action -SourceIdentifier ClipboardWatcher
 }
 
