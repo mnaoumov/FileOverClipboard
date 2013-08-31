@@ -85,7 +85,7 @@ function Get-ClipboardCommand
 
     $lines = $text -split "`n"
 
-    if ($lines.Length -ne 2)
+    if ($lines.Length -ne 3)
     {
         return $badCommand
     }
