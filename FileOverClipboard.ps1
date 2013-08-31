@@ -189,6 +189,7 @@ function Unregister-ClipboardWatcher
     {
         $Global:ClipboardWatcher.Dispose();
         Remove-Variable ClipboardWatcher -Scope Global
+        Unregister-Event -SourceIdentifier ClipboardWatcher
     }
 }
 
@@ -332,6 +333,7 @@ function Register-ClipboardTextChangedEvent
 
     $watcher = Register-ClipboardWatcher
     Register-ObjectEvent $watcher -EventName ClipboardTextChanged -Action $Action
+    Register-ObjectEvent $watcher -EventName ClipboardTextChanged -Action $Action -SourceIdentifier ClipboardWatcher
 }
 
 Main
