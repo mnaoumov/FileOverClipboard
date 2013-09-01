@@ -35,7 +35,12 @@ function Send-FileOverClipboard
         throw "File $FilePath not exists"
     }
 
-    $global:a = 0
+    $FilePath = Resolve-PathSafe $FilePath
+
+    $Global:FileName = (Get-Item -Path $FilePath).Name
+    $Global:ChunksCount = [Math]::Ceiling((Get-Item -Path $FilePath).Length / $BufferSize)
+    $Global:CurrentChunk = 0
+    $Global:FileReader = [System.IO.File]::OpenRead($FilePath)
 
     Register-ClipboardTextChangedEvent -Action `
         {
@@ -49,34 +54,39 @@ function Send-FileOverClipboard
 
     Register-EngineEvent -SourceIdentifier Receiver.Started -Action `
         {
-            Write-Host "Sending file"
-            Send-ClipboardEvent -Name Sender.Sent -Argument "TODO"
+            Write-Progress -Activity "Sending file $FileName" -Status Starting
+            Send-ClipboardEvent -Name Sender.HeaderSent -Argument ("$FileName", "$ChunksCount" -join $Delimiter)
         } | Out-Null
 
     Register-EngineEvent -SourceIdentifier Receiver.Received -Action `
         {
-            Write-Host "Received"
-            $a++
-            if ($a -eq 10)
+            $CurrentChunk++
+            if ($CurrentChunk -gt $ChunksCount)
             {
-                Write-Host "Done!"
+                $FileReader.Dispose()
                 Send-ClipboardEvent -Name Sender.Completed
             }
-            else {
-                Write-Host "Sending file"
-                Send-ClipboardEvent -Name Sender.Sent -Argument "TODO"
+            else
+            {
+                Write-Progress -Activity "Sending file $FileName" -Status "Sending chunk $CurrentChunk of $ChunksCount" -PercentComplete ($CurrentChunk / $ChunksCount * 100)
+                $buffer = New-Object byte[] $BufferSize
+                $bytesRead = $FileReader.Read($buffer, 0, $BufferSize);
+                $base64 = [Convert]::ToBase64String($buffer, 0, $bytesRead)
+                Send-ClipboardEvent -Name Sender.Sent -Argument $base64
             }
-            
         } | Out-Null
 
     Send-ClipboardEvent -Name Sender.Started
     Wait-Event -SourceIdentifier Sender.Completed | Remove-Event
     Unregister-ClipboardWatcher
     Cleanup-Subscriptions
+    $FileReader.Dispose()
 }
 
 function Receive-FileOverClipboard
 {
+    $Global:CurrentChunk = 0
+
     Register-ClipboardTextChangedEvent -Action `
         {
             param
@@ -92,14 +102,30 @@ function Receive-FileOverClipboard
             Send-ClipboardEvent -Name Receiver.Started
         } | Out-Null
 
+    Register-EngineEvent -SourceIdentifier Sender.HeaderSent -Action `
+        {
+            $headers = $Event.SourceArgs -split $Delimiter
+            $Global:FileName = $headers[0]
+            $Global:ChunksCount = [int] $headers[1]
+            $Global:FileWriter = [System.IO.File]::OpenWrite((Resolve-PathSafe $FileName))
+            Write-Progress -Activity "Receiving file $FileName" -Status Starting
+            Send-ClipboardEvent -Name Receiver.Received
+        } | Out-Null
+
+
     Register-EngineEvent -SourceIdentifier Sender.Sent -Action `
         {
-            Write-Host "Received $($Event.SourceEventArgs)"
-            Send-ClipboardEvent -Name Receiver.Received
+            $CurrentChunk++
+            Write-Progress -Activity "Receiving file $FileName" -Status "Receiving chunk $CurrentChunk of $ChunksCount" -PercentComplete ($CurrentChunk / $ChunksCount * 100)
+            $base64 = $Event.SourceArgs
+            $bytes = [Convert]::FromBase64String($base64);
+            $FileWriter.Write($bytes, 0, $bytes.Length);
+            Send-ClipboardEvent -Name Receiver.Received -Argument $base64
         } | Out-Null
 
     Register-EngineEvent -SourceIdentifier Sender.Completed -Action `
         {
+            $FileWriter.Dispose()
             Send-ClipboardEvent -Name Receiver.Completed
         } | Out-Null
 
@@ -107,6 +133,16 @@ function Receive-FileOverClipboard
     Wait-Event -SourceIdentifier Receiver.Completed | Remove-Event
     Unregister-ClipboardWatcher
     Cleanup-Subscriptions
+}
+
+function Global:Resolve-PathSafe
+{
+    param
+    (
+        [string] $Path
+    )
+     
+    $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
 }
 
 function Cleanup-Subscriptions
@@ -119,7 +155,8 @@ function Cleanup-Subscriptions
     Get-Job -Name Receiver.* | Remove-Job
 }
 
-$Global:ClipboardEventPrefix = "===+++"
+$Global:Delimiter = "===Delimiter==="
+$Global:BufferSize = 9000
 
 function Global:Receive-ClipboardEvent
 {
@@ -127,8 +164,6 @@ function Global:Receive-ClipboardEvent
     (
         [string] $text
     )
-
-    Write-Verbose "Received text: $text"
 
     if (-not $text)
     {
@@ -142,15 +177,15 @@ function Global:Receive-ClipboardEvent
         return
     }
 
-    if (-not $lines[0].StartsWith($ClipboardEventPrefix))
+    if (-not $lines[0].StartsWith($Delimiter))
     {
         return
     }
 
-    $eventName = $lines[0].Substring($ClipboardEventPrefix.Length)
+    $eventName = $lines[0].Substring($Delimiter.Length)
     $eventArgument = $lines[1]
 
-    Write-Verbose "Received event $eventName with argument $eventArgument"
+    Write-Verbose "Received event $eventName"
 
     New-Event -SourceIdentifier $eventName -EventArguments $eventArgument | Out-Null
 }
@@ -163,9 +198,9 @@ function Global:Send-ClipboardEvent
         [string] $Argument
     )
 
-    Write-Verbose "Sending event $Name with argument $Argument"
+    Write-Verbose "Sending event $Name"
 
-    "$ClipboardEventPrefix$Name`n$Argument" | Set-ClipboardText
+    "$Delimiter$Name`n$Argument" | Set-ClipboardText
 }
 
 function Global:Set-ClipboardText
