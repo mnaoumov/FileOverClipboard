@@ -42,15 +42,20 @@ function Send-FileOverClipboard
                 $text
             )
 
-            $command = Get-ClipboardCommand $text
-
-            Invoke-SendFileProcessor $command
+            Receive-ClipboardEvent $text
         } | Out-Null
 
-    Send-ClipboardCommand -Name StartSend
-    Wait-Event -SourceIdentifier Send.Complete | Out-Null
+    Send-ClipboardEvent -Name Sender.Started
+
+    Register-EngineEvent -SourceIdentifier Sender.Started -Action `
+        {
+            Write-Host "Sender started"
+            Start-Sleep 5
+            New-Event -SourceIdentifier Sender.Completed | Out-Null
+        }
+
+    Wait-Event -SourceIdentifier Sender.Completed | Remove-Event
     Unregister-ClipboardWatcher
-    Remove-Event -SourceIdentifier Send.Complete
 }
 
 function Receive-FileOverClipboard
@@ -62,56 +67,48 @@ function Receive-FileOverClipboard
                 $text
             )
 
-            $command = Get-ClipboardCommand $text
-
-            Invoke-ReceiveFileProcessor $command
+            Receive-ClipboardEvent $text
         } | Out-Null
 
-    Wait-Event -SourceIdentifier Receive.Complete | Out-Null
+    Send-ClipboardEvent -Name Receiver.Started
+    Wait-Event -SourceIdentifier Receiver.Completed | Remove-Event
     Unregister-ClipboardWatcher
-    Remove-Event -SourceIdentifier Receive.Complete
+
 }
 
-$Global:ClipboardCommandPrefix = "===+++"
+$Global:ClipboardEventPrefix = "===+++"
 
-function Global:Get-ClipboardCommand
+function Global:Receive-ClipboardEvent
 {
     param
     (
         [string] $text
     )
 
-    $badCommand = New-Object PSObject -Property `
-        @{
-            Name = $null;
-            Argument = $null;
-        }
-
     if (-not $text)
     {
-        return $badCommand
+        return
     }
 
     $lines = $text -split "`n"
 
     if ($lines.Length -ne 3)
     {
-        return $badCommand
+        return
     }
 
-    if (-not $lines[0].StartsWith($ClipboardCommandPrefix))
+    if (-not $lines[0].StartsWith($ClipboardEventPrefix))
     {
-        return $badCommand
+        return
     }
 
-    return New-Object PSObject -Property `
-        @{
-            Name = $lines[0].Substring($ClipboardCommandPrefix.Length)
-            Argument = $lines[1];
-        }
+    $eventName = $lines[0].Substring($ClipboardEventPrefix.Length)
+    $eventArgument = $lines[1]
+
+    New-Event -SourceIdentifier $eventName -EventArguments $eventArgument | Out-Null
 }
 
-function Global:Send-ClipboardCommand
+function Global:Send-ClipboardEvent
 {
     param
     (
@@ -119,58 +116,7 @@ function Global:Send-ClipboardCommand
         [string] $Argument
     )
 
-    "$ClipboardCommandPrefix$Name`n$Argument" | clip
-}
-
-function Global:Invoke-SendFileProcessor
-{
-    param
-    (
-        $command
-    )
-
-    Write-Verbose "Processing command: $Command"
-
-    switch ($command.Name)
-    {
-        default
-            {
-                return
-            }
-
-        "StartSend"
-            {
-                New-Event -SourceIdentifier Send.Complete | Out-Null
-            }
-    }
-}
-
-function Global:Invoke-ReceiveFileProcessor
-{
-    param
-    (
-        $command
-    )
-
-    Write-Verbose "Processing command: $Command"
-
-    switch ($command.Name)
-    {
-        default
-            {
-                return
-            }
-
-        "StartSend"
-            {
-                Send-ClipboardCommand -Name StartReceive
-            }
-
-        "StartReceive"
-            {
-                New-Event -SourceIdentifier Receive.Complete | Out-Null
-            } 
-    }
+    "$ClipboardEventPrefix$Name`n$Argument" | clip
 }
 
 function Register-ClipboardWatcher
