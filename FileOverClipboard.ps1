@@ -35,6 +35,8 @@ function Send-FileOverClipboard
         throw "File $FilePath not exists"
     }
 
+    $global:a = 0
+
     Register-ClipboardTextChangedEvent -Action `
         {
             param
@@ -45,17 +47,32 @@ function Send-FileOverClipboard
             Receive-ClipboardEvent $text
         } | Out-Null
 
-    Send-ClipboardEvent -Name Sender.Started
-
-    Register-EngineEvent -SourceIdentifier Sender.Started -Action `
+    Register-EngineEvent -SourceIdentifier Receiver.Started -Action `
         {
-            Write-Host "Sender started"
-            Start-Sleep 5
-            New-Event -SourceIdentifier Sender.Completed | Out-Null
-        }
+            Write-Host "Sending file"
+            Send-ClipboardEvent -Name Sender.Sent -Argument "TODO"
+        } | Out-Null
 
+    Register-EngineEvent -SourceIdentifier Receiver.Received -Action `
+        {
+            Write-Host "Received"
+            $a++
+            if ($a -eq 10)
+            {
+                Write-Host "Done!"
+                Send-ClipboardEvent -Name Sender.Completed
+            }
+            else {
+                Write-Host "Sending file"
+                Send-ClipboardEvent -Name Sender.Sent -Argument "TODO"
+            }
+            
+        } | Out-Null
+
+    Send-ClipboardEvent -Name Sender.Started
     Wait-Event -SourceIdentifier Sender.Completed | Remove-Event
     Unregister-ClipboardWatcher
+    Cleanup-Subscriptions
 }
 
 function Receive-FileOverClipboard
@@ -70,10 +87,36 @@ function Receive-FileOverClipboard
             Receive-ClipboardEvent $text
         } | Out-Null
 
+    Register-EngineEvent -SourceIdentifier Sender.Started -Action `
+        {
+            Send-ClipboardEvent -Name Receiver.Started
+        } | Out-Null
+
+    Register-EngineEvent -SourceIdentifier Sender.Sent -Action `
+        {
+            Write-Host "Received $($Event.SourceEventArgs)"
+            Send-ClipboardEvent -Name Receiver.Received
+        } | Out-Null
+
+    Register-EngineEvent -SourceIdentifier Sender.Completed -Action `
+        {
+            Send-ClipboardEvent -Name Receiver.Completed
+        } | Out-Null
+
     Send-ClipboardEvent -Name Receiver.Started
     Wait-Event -SourceIdentifier Receiver.Completed | Remove-Event
     Unregister-ClipboardWatcher
+    Cleanup-Subscriptions
+}
 
+function Cleanup-Subscriptions
+{
+    Get-Event Sender.* | Remove-Event
+    Get-Event Receiver.* | Remove-Event
+    Get-EventSubscriber -SourceIdentifier Sender.* | Unregister-Event
+    Get-EventSubscriber -SourceIdentifier Receiver.* | Unregister-Event
+    Get-Job -Name Sender.* | Remove-Job
+    Get-Job -Name Receiver.* | Remove-Job
 }
 
 $Global:ClipboardEventPrefix = "===+++"
@@ -84,6 +127,8 @@ function Global:Receive-ClipboardEvent
     (
         [string] $text
     )
+
+    Write-Verbose "Received text: $text"
 
     if (-not $text)
     {
@@ -105,6 +150,8 @@ function Global:Receive-ClipboardEvent
     $eventName = $lines[0].Substring($ClipboardEventPrefix.Length)
     $eventArgument = $lines[1]
 
+    Write-Verbose "Received event $eventName with argument $eventArgument"
+
     New-Event -SourceIdentifier $eventName -EventArguments $eventArgument | Out-Null
 }
 
@@ -116,7 +163,20 @@ function Global:Send-ClipboardEvent
         [string] $Argument
     )
 
-    "$ClipboardEventPrefix$Name`n$Argument" | clip
+    Write-Verbose "Sending event $Name with argument $Argument"
+
+    "$ClipboardEventPrefix$Name`n$Argument" | Set-ClipboardText
+}
+
+function Global:Set-ClipboardText
+{
+    param
+    (
+        [Parameter(ValueFromPipeline = $true)]
+        [string] $text
+    )
+
+    $text | clip
 }
 
 function Register-ClipboardWatcher
