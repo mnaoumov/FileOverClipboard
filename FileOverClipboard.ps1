@@ -253,7 +253,23 @@ public class ClipboardWatcherForm : Form
     void ClipboardChanged()
     {
         if (Clipboard.ContainsText())
-            ClipboardTextChanged(Clipboard.GetText());
+        {
+            string text = "";
+            for (int i = 0; i < 10; i++)
+            {
+                text = Clipboard.GetText();
+                if (string.IsNullOrEmpty(text))
+                {
+                    Thread.Sleep(10);
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            ClipboardTextChanged(text);
+        }
     }
 }
 
