@@ -41,6 +41,8 @@ function Send-FileOverClipboard
     $Global:ChunksCount = [Math]::Ceiling((Get-Item -Path $FilePath).Length / $BufferSize)
     $Global:CurrentChunk = 0
     $Global:FileReader = [System.IO.File]::OpenRead($FilePath)
+    $Global:Party = "Sender"
+    $Global:MessageIndex = 0
 
     Register-ClipboardTextChangedEvent -Action `
         {
@@ -86,6 +88,8 @@ function Send-FileOverClipboard
 function Receive-FileOverClipboard
 {
     $Global:CurrentChunk = 0
+    $Global:Party = "Receiver"
+    $Global:MessageIndex = -1
 
     Register-ClipboardTextChangedEvent -Action `
         {
@@ -157,6 +161,7 @@ function Cleanup-Subscriptions
 
 $Global:Delimiter = "===Delimiter==="
 $Global:BufferSize = 9000
+$Global:MessagesDelivered = @()
 
 function Global:Receive-ClipboardEvent
 {
@@ -165,28 +170,34 @@ function Global:Receive-ClipboardEvent
         [string] $text
     )
 
-    if (-not $text)
+    if (-not $text -or ($text -notlike "$Delimiter*"))
     {
         return
     }
 
     $lines = $text -split "`n"
 
-    if ($lines.Length -ne 3)
+    $eventMessageIndex = $lines[1]
+    $eventParty = $lines[2]
+    $eventName = $lines[3]
+    $eventArgument = $lines[4]
+
+    if ($eventParty -ne $Party)
     {
         return
     }
 
-    if (-not $lines[0].StartsWith($Delimiter))
+    if ($Global:MessagesDelivered -contains $eventMessageIndex)
     {
         return
     }
 
-    $eventName = $lines[0].Substring($Delimiter.Length)
-    $eventArgument = $lines[1]
+    $Global:MessagesDelivered += $eventMessageIndex
+    New-Event -SourceIdentifier Clipboard.MessageDelivered
 
     Write-Verbose "Received event $eventName"
 
+    $MessageIndex = $eventMessageIndex + 1
     New-Event -SourceIdentifier $eventName -EventArguments $eventArgument | Out-Null
 }
 
@@ -200,7 +211,14 @@ function Global:Send-ClipboardEvent
 
     Write-Verbose "Sending event $Name"
 
-    "$Delimiter$Name`n$Argument" | Set-ClipboardText
+    $text = @($Delimiter, $MessageIndex, $Party, $Name, $Argument) -join "`n"
+
+    do
+    {
+        $text | Set-ClipboardText
+        Wait-Event Clipboard.MessageDelivered -Timeout 0.2
+    }
+    while ($Global:MessagesDelivered -notcontains $MessageIndex)
 }
 
 function Global:Set-ClipboardText
