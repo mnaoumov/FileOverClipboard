@@ -133,7 +133,6 @@ function Receive-FileOverClipboard
             Send-ClipboardEvent -Name Receiver.Completed
         } | Out-Null
 
-    Send-ClipboardEvent -Name Receiver.Started
     Wait-Event -SourceIdentifier Receiver.Completed | Remove-Event
     Unregister-ClipboardWatcher
     Cleanup-Subscriptions
