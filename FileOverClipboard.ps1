@@ -176,7 +176,7 @@ function Global:Receive-ClipboardEvent
 
     $lines = $text -split "`n"
 
-    $eventMessageIndex = $lines[1]
+    $eventMessageIndex = [int] $lines[1]
     $eventParty = $lines[2]
     $eventName = $lines[3]
     $eventArgument = $lines[4]
