@@ -181,7 +181,7 @@ function Global:Receive-ClipboardEvent
     $eventName = $lines[3]
     $eventArgument = $lines[4]
 
-    if ($eventParty -ne $Party)
+    if ($eventParty -eq $Party)
     {
         return
     }
