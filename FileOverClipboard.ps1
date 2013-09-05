@@ -192,7 +192,7 @@ function Global:Receive-ClipboardEvent
     }
 
     $Global:MessagesDelivered += $eventMessageIndex
-    New-Event -SourceIdentifier Clipboard.MessageDelivered
+    New-Event -SourceIdentifier Clipboard.MessageDelivered | Out-Null
 
     Write-Verbose "Received event $eventName"
 
