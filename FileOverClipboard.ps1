@@ -160,7 +160,6 @@ function Cleanup-Subscriptions
 
 $Global:Delimiter = "===Delimiter==="
 $Global:BufferSize = 9000
-$Global:MessagesDelivered = @()
 
 function Global:Receive-ClipboardEvent
 {
@@ -186,17 +185,16 @@ function Global:Receive-ClipboardEvent
         return
     }
 
-    if ($Global:MessagesDelivered -contains $eventMessageIndex)
+    if ($MessageIndex -ge $eventMessageIndex)
     {
         return
     }
 
-    $Global:MessagesDelivered += $eventMessageIndex
     New-Event -SourceIdentifier Clipboard.MessageDelivered | Out-Null
 
     Write-Verbose "Received event $eventName"
 
-    $MessageIndex = $eventMessageIndex + 1
+    $Global:MessageIndex = $eventMessageIndex + 1
     New-Event -SourceIdentifier $eventName -EventArguments $eventArgument | Out-Null
 }
 
@@ -208,16 +206,18 @@ function Global:Send-ClipboardEvent
         [string] $Argument
     )
 
-    Write-Verbose "Sending event $Name"
+    $index = $MessageIndex
 
-    $text = @($Delimiter, $MessageIndex, $Party, $Name, $Argument) -join "`n"
+    Write-Verbose "Sending event $index - $Name"
+
+    $text = @($Delimiter, $index, $Party, $Name, $Argument) -join "`n"
 
     do
     {
         $text | Set-ClipboardText
-        Wait-Event Clipboard.MessageDelivered -Timeout 0.2 | Remove-Event
+        Wait-Event Clipboard.MessageDelivered -Timeout 5 | Remove-Event
     }
-    while ($Global:MessagesDelivered -notcontains $MessageIndex)
+    while ($MessageIndex -lt $index)
 }
 
 function Global:Set-ClipboardText
