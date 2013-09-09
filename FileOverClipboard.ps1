@@ -215,7 +215,7 @@ function Global:Send-ClipboardEvent
     do
     {
         $text | Set-ClipboardText
-        Wait-Event Clipboard.MessageDelivered -Timeout 5 | Remove-Event
+        Wait-Event Clipboard.MessageDelivered -Timeout 5
     }
     while ($MessageIndex -lt $index)
 }
