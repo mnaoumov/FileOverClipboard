@@ -51,6 +51,8 @@ function Send-FileOverClipboard
                 $text
             )
 
+            write-host "text: $text"
+
             Receive-ClipboardEvent $text
         } | Out-Null
 
@@ -80,6 +82,7 @@ function Send-FileOverClipboard
 
     Send-ClipboardEvent -Name Sender.Started
     Wait-Event -SourceIdentifier Sender.Completed | Remove-Event
+    $MessageIndex = [int]::MaxValue
     Unregister-ClipboardWatcher
     Cleanup-Subscriptions
     $FileReader.Dispose()
@@ -97,6 +100,8 @@ function Receive-FileOverClipboard
             (
                 $text
             )
+
+            write-host "text: $text"
 
             Receive-ClipboardEvent $text
         } | Out-Null
@@ -134,6 +139,7 @@ function Receive-FileOverClipboard
         } | Out-Null
 
     Wait-Event -SourceIdentifier Receiver.Completed | Remove-Event
+    $MessageIndex = [int]::MaxValue
     Unregister-ClipboardWatcher
     Cleanup-Subscriptions
 }
@@ -190,11 +196,9 @@ function Global:Receive-ClipboardEvent
         return
     }
 
-    New-Event -SourceIdentifier Clipboard.MessageDelivered | Out-Null
-
     Write-Verbose "Received event $eventName"
-
     $Global:MessageIndex = $eventMessageIndex + 1
+    New-Event -SourceIdentifier Clipboard.MessageDelivered | Out-Null
     New-Event -SourceIdentifier $eventName -EventArguments $eventArgument | Out-Null
 }
 
@@ -214,8 +218,10 @@ function Global:Send-ClipboardEvent
 
     do
     {
+        write-host "sending $index"
         $text | Set-ClipboardText
-        Wait-Event Clipboard.MessageDelivered -Timeout 5
+        Wait-Event Clipboard.MessageDelivered -Timeout 5 | Remove-Event
+        write-host "MessageIndex $MessageIndex"
     }
     while ($MessageIndex -le $index)
 }
