@@ -35,6 +35,22 @@ function Send-FileOverClipboard
         throw "File $FilePath not exists"
     }
 
+    $timer = New-Object System.Timers.Timer -Property `
+        @{
+            Interval = 1000
+        }
+    $timer.Start()
+
+    Register-ObjectEvent -InputObject $timer -EventName Elapsed -Action `
+        {
+            if ($MessageIndex -le $LastClipboardMessageIndex)
+            {
+                Write-Host "Resending $MessageIndex"
+                $LastClipboardMessage | clip
+            }
+        }
+
+
     $FilePath = Resolve-PathSafe $FilePath
 
     $Global:FileName = (Get-Item -Path $FilePath).Name
@@ -81,11 +97,13 @@ function Send-FileOverClipboard
         } | Out-Null
 
     Send-ClipboardEvent -Name Sender.Started
+
     Wait-Event -SourceIdentifier Sender.Completed | Remove-Event
     $MessageIndex = [int]::MaxValue
     Unregister-ClipboardWatcher
     Cleanup-Subscriptions
     $FileReader.Dispose()
+    $timer.Stop()
 }
 
 function Receive-FileOverClipboard
@@ -93,6 +111,22 @@ function Receive-FileOverClipboard
     $Global:CurrentChunk = 0
     $Global:Party = "Receiver"
     $Global:MessageIndex = -1
+
+        $timer = New-Object System.Timers.Timer -Property `
+        @{
+            Interval = 1000
+        }
+    $timer.Start()
+
+    Register-ObjectEvent -InputObject $timer -EventName Elapsed -Action `
+        {
+            if ($MessageIndex -le $LastClipboardMessageIndex)
+            {
+                Write-Host "Resending $MessageIndex"
+                $LastClipboardMessage | clip
+            }
+        }
+
 
     Register-ClipboardTextChangedEvent -Action `
         {
@@ -142,6 +176,7 @@ function Receive-FileOverClipboard
     $MessageIndex = [int]::MaxValue
     Unregister-ClipboardWatcher
     Cleanup-Subscriptions
+    $timer.Stop()
 }
 
 function Global:Resolve-PathSafe
@@ -166,6 +201,8 @@ function Cleanup-Subscriptions
 
 $Global:Delimiter = "===Delimiter==="
 $Global:BufferSize = 9000
+$Global:LastClipboardMessage = $null
+$Global:LastClipboardMessageIndex = -1
 
 function Global:Receive-ClipboardEvent
 {
@@ -215,15 +252,9 @@ function Global:Send-ClipboardEvent
     Write-Verbose "Sending event $index - $Name"
 
     $text = @($Delimiter, $index, $Party, $Name, $Argument) -join "`n"
-
-    do
-    {
-        write-host "sending $index"
-        $text | Set-ClipboardText
-        Wait-Event Clipboard.MessageDelivered -Timeout 5 | Remove-Event
-        write-host "MessageIndex $MessageIndex"
-    }
-    while ($MessageIndex -le $index)
+    $text | Set-ClipboardText
+    $Global:LastClipboardMessage = $text
+    $Global:LastClipboardMessageIndex = $index
 }
 
 function Global:Set-ClipboardText
